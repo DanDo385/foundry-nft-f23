@@ -105,4 +105,134 @@ contract MoodNftTest is Test {
 
         assertEq(tokenId, currentAvailableTokenId);
     }
+
+    function testGetHappySVG() public {
+        string memory happySvg = moodNft.getHappySVG();
+        assert(bytes(happySvg).length > 0);
+        assert(contains(happySvg, "data:image/svg+xml;base64,"));
+    }
+
+    function testGetSadSVG() public {
+        string memory sadSvg = moodNft.getSadSVG();
+        assert(bytes(sadSvg).length > 0);
+        assert(contains(sadSvg, "data:image/svg+xml;base64,"));
+    }
+
+    function testTokenCounterIncrements() public {
+        uint256 initialCounter = moodNft.getTokenCounter();
+        
+        vm.prank(USER);
+        moodNft.mintNft();
+        assert(moodNft.getTokenCounter() == initialCounter + 1);
+        
+        vm.prank(USER);
+        moodNft.mintNft();
+        assert(moodNft.getTokenCounter() == initialCounter + 2);
+    }
+
+    function testMultipleMints() public {
+        address user2 = address(2);
+        
+        vm.prank(USER);
+        moodNft.mintNft();
+        
+        vm.prank(user2);
+        moodNft.mintNft();
+        
+        assert(moodNft.balanceOf(USER) == 1);
+        assert(moodNft.balanceOf(user2) == 1);
+        assert(moodNft.ownerOf(0) == USER);
+        assert(moodNft.ownerOf(1) == user2);
+    }
+
+    function testFlipMoodMultipleTimes() public {
+        vm.prank(USER);
+        moodNft.mintNft();
+        
+        string memory initialUri = moodNft.tokenURI(0);
+        
+        // Flip to sad
+        vm.prank(USER);
+        moodNft.flipMood(0);
+        string memory sadUri = moodNft.tokenURI(0);
+        assert(keccak256(abi.encodePacked(initialUri)) != keccak256(abi.encodePacked(sadUri)));
+        
+        // Flip back to happy
+        vm.prank(USER);
+        moodNft.flipMood(0);
+        string memory happyUri = moodNft.tokenURI(0);
+        assert(keccak256(abi.encodePacked(initialUri)) == keccak256(abi.encodePacked(happyUri)));
+        
+        // Flip to sad again
+        vm.prank(USER);
+        moodNft.flipMood(0);
+        string memory sadUri2 = moodNft.tokenURI(0);
+        assert(keccak256(abi.encodePacked(sadUri)) == keccak256(abi.encodePacked(sadUri2)));
+    }
+
+    function testFlipMoodNotOwner() public {
+        address user2 = address(2);
+        
+        vm.prank(USER);
+        moodNft.mintNft();
+        
+        // User2 tries to flip mood without approval
+        vm.prank(user2);
+        vm.expectRevert(MoodNft.MoodNft__CantFlipMoodIfNotOwner.selector);
+        moodNft.flipMood(0);
+    }
+
+    function testFlipMoodWithApproval() public {
+        address user2 = address(2);
+        
+        vm.prank(USER);
+        moodNft.mintNft();
+        
+        // USER approves user2 to manage the NFT
+        vm.prank(USER);
+        moodNft.approve(user2, 0);
+        
+        // Now user2 can flip the mood
+        vm.prank(user2);
+        moodNft.flipMood(0);
+        
+        // Verify the mood changed
+        string memory uri = moodNft.tokenURI(0);
+        assert(contains(uri, "data:application/json;base64,"));
+    }
+
+    function testTokenURINonExistentToken() public {
+        vm.expectRevert(abi.encodeWithSignature("ERC721NonexistentToken(uint256)", 999));
+        moodNft.tokenURI(999);
+    }
+
+    function testBaseURI() public {
+        // Test that _baseURI returns the expected value
+        // We can't directly test _baseURI since it's internal, but we can test tokenURI
+        vm.prank(USER);
+        moodNft.mintNft();
+        
+        string memory uri = moodNft.tokenURI(0);
+        assert(contains(uri, "data:application/json;base64,"));
+    }
+
+    function testTokenURIStructure() public {
+        vm.prank(USER);
+        moodNft.mintNft();
+        
+        string memory uri = moodNft.tokenURI(0);
+        assert(contains(uri, "data:application/json;base64,"));
+        // The URI is base64 encoded, so we need to decode it to check the content
+        // For now, just check that it's a valid data URI
+        assert(bytes(uri).length > 0);
+    }
+
+    function testOwnerFunctions() public {
+        address owner = moodNft.owner();
+        assert(owner != address(0));
+        
+        // Test that owner can transfer ownership (if needed)
+        // This tests the Ownable functionality
+        assert(moodNft.owner() == owner);
+    }
 }

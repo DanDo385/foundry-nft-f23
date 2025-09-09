@@ -48,5 +48,57 @@ contract BasicNftTest is Test {
         assert(basicNft.getTokenCounter() == startingTokenCount + 1);
     }
 
-    // can you get the coverage up?
+    function testTokenCounterIncrements() public {
+        uint256 initialCounter = basicNft.getTokenCounter();
+        
+        vm.prank(USER);
+        basicNft.mintNft(PUG_URI);
+        assert(basicNft.getTokenCounter() == initialCounter + 1);
+        
+        vm.prank(USER);
+        basicNft.mintNft("ipfs://another-uri");
+        assert(basicNft.getTokenCounter() == initialCounter + 2);
+    }
+
+    function testTokenURINotFound() public {
+        // Try to get URI for non-existent token
+        vm.expectRevert(abi.encodeWithSignature("ERC721NonexistentToken(uint256)", 999));
+        basicNft.tokenURI(999);
+    }
+
+    function testMultipleMints() public {
+        address user2 = address(2);
+        string memory uri2 = "ipfs://another-pug-uri";
+        
+        vm.prank(USER);
+        basicNft.mintNft(PUG_URI);
+        
+        vm.prank(user2);
+        basicNft.mintNft(uri2);
+        
+        assert(basicNft.balanceOf(USER) == 1);
+        assert(basicNft.balanceOf(user2) == 1);
+        assert(basicNft.ownerOf(0) == USER);
+        assert(basicNft.ownerOf(1) == user2);
+        
+        assert(keccak256(abi.encodePacked(basicNft.tokenURI(0))) == keccak256(abi.encodePacked(PUG_URI)));
+        assert(keccak256(abi.encodePacked(basicNft.tokenURI(1))) == keccak256(abi.encodePacked(uri2)));
+    }
+
+    function testEmptyTokenURI() public {
+        vm.prank(USER);
+        basicNft.mintNft(""); // Empty URI
+        
+        assert(basicNft.balanceOf(USER) == 1);
+        assert(keccak256(abi.encodePacked(basicNft.tokenURI(0))) == keccak256(abi.encodePacked("")));
+    }
+
+    function testLongTokenURI() public {
+        string memory longURI = "ipfs://bafybeig37ioir76s7mg5oobetncojcm3c3hxasyd4rvid4jqhy4gkaheg4/?filename=very-long-filename-that-might-cause-issues.json";
+        
+        vm.prank(USER);
+        basicNft.mintNft(longURI);
+        
+        assert(keccak256(abi.encodePacked(basicNft.tokenURI(0))) == keccak256(abi.encodePacked(longURI)));
+    }
 }
